@@ -33,6 +33,6 @@ int main()
                                CommunicationProtocol::PRESENTER_IP_PORT,
                                CommunicationProtocol::PRESENTER_CLIENT_MESSAGE_QUEUE_SIZE);
     CommunicationDispatcher dispatcher(&client);
-    dispatcher.doWork();
+    dispatcher.startWork();
     return 0;
 }

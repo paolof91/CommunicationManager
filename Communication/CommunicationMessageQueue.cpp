@@ -30,7 +30,6 @@ CommunicationMessageQueue::CommunicationMessageQueue(uint16_t queueMaxSize)
 {
 
     m_queueMaxSize = queueMaxSize;
-    printf("queue max size: %d \n ",m_queueMaxSize );
     m_front = nullptr;
     m_rear = nullptr;
     m_size = 0;
@@ -63,7 +62,6 @@ int CommunicationMessageQueue::enqueue(CommunicationMessage message)
         m_rear = n;
     }
     n->message = message;
-    printf("enqueuing %s\n", message.data);
 
     // if max size has been reached, discard front
     if (m_size == m_queueMaxSize)
@@ -79,8 +77,6 @@ int CommunicationMessageQueue::enqueue(CommunicationMessage message)
         ret = 0;
         m_size++;
     }
-
-    printf("queue size: %d", m_size);
 
     return ret;
 }

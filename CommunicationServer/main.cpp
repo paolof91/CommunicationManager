@@ -34,19 +34,21 @@ int main()
     CommunicationServer server(CommunicationProtocol::PRESENTER_IP_ADDRESS,
                                CommunicationProtocol::PRESENTER_IP_PORT,
                                CommunicationProtocol::PRESENTER_SERVER_MESSAGE_QUEUE_SIZE);
-    printf("about to send the first from main\n");
     CommunicationMessage m;
     m.messageType = 0x10;
     char a[] = "ciao, message 1";
+    printf("Sending: %s\n",a);
     memcpy(m.data,a,15);
     m.size = sizeof(a);
     server.sendMessage(m);
 
     a[14] = '2';
+    printf("Sending: %s\n",a);
     memcpy(m.data,a,15);
     server.sendMessage(m);
 
     a[14] = '3';
+    printf("Sending: %s\n",a);
     memcpy(m.data,a,15);
     server.sendMessage(m);
 

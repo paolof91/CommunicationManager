@@ -105,7 +105,6 @@ void CommunicationServer::serverStateMachineHandler()
     {
         if(m_status==WAITING_FOR_CLIENT_CONNECTION)
         {
-            printf("wait iteration %d\n",i++);
             waitForClientConnection();
         }
         if(m_status==CONNECTED)
@@ -147,12 +146,10 @@ void CommunicationServer::sendMessagesFromQueue()
 
     if (!isEmpty)
     {
-        printf("non empty queue \n");
         CommunicationMessage m;
         pthread_mutex_lock( &m_queueMutex );
         m_queue->dequeue(m);
         pthread_mutex_unlock( &m_queueMutex );
-        printf("Sending message with data: %s\n",m.data);
         memcpy(m_buffer,&m,CommunicationMessage::getHeaderSize() + m.size);
 
         // send is a blocking call (it waits for the server to read, before continuing))
@@ -167,7 +164,6 @@ int CommunicationServer::sendMessage(CommunicationMessage message)
 {
     int ret = 0;
     pthread_mutex_lock( &m_queueMutex );
-    printf("actually enqueuing\n");
     ret = m_queue->enqueue(message);
     pthread_mutex_unlock( &m_queueMutex );
     return ret;

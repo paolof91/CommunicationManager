@@ -49,7 +49,7 @@ public:
     CommunicationClient(const char *addressString, uint16_t port, uint16_t queueSize);
     ~CommunicationClient();
     void terminateConnection() { m_status = TERMINATED; };
-    int receiveAvailableMessage(CommunicationMessage &message);
+    int receiveMessageIfAvailable(CommunicationMessage &message);
     CommunicationClientStatus status() { return m_status; }
 
 private:

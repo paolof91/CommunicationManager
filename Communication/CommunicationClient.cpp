@@ -138,7 +138,6 @@ void CommunicationClient::receiveAndStoreMessages()
     int valread;
     CommunicationMessage message;
 
-    printf("Trying to read...\n");
     // read is a blocking call (it waits for the client to send something, before continuing)
     valread = read(m_socket, m_buffer, CommunicationMessage::getHeaderSize());
     if (valread<0)
@@ -166,14 +165,12 @@ void CommunicationClient::receiveAndStoreMessages()
     pthread_mutex_lock( &m_queueMutex );
     m_queue->enqueue(message);
     pthread_mutex_unlock( &m_queueMutex );
-
-    printf("Received and enqueued...\n");
 }
 
 /*
  * returns -1 if no message in the queue, otherwise returns 0
  */
-int CommunicationClient::receiveAvailableMessage(CommunicationMessage &message)
+int CommunicationClient::receiveMessageIfAvailable(CommunicationMessage &message)
 {
     int ret = 0;
 
