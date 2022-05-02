@@ -37,12 +37,17 @@
 CommunicationServer::CommunicationServer(const char *addressString, uint16_t port, uint16_t queueSize)
 {
     // Creating message queue
+    if ( queueSize == 0 )
+    {
+        perror("Error: Server queue size is 0");
+        exit(EXIT_FAILURE);
+    }
     m_queue = new CommunicationMessageQueue(queueSize);
 
     // Creating socket file descriptor
     if ((m_server_fd = socket(AF_INET, SOCK_STREAM, 0))
         == 0) {
-        perror("socket failed");
+        perror("Error: server socket failed");
         exit(EXIT_FAILURE);
     }
 
@@ -51,7 +56,7 @@ CommunicationServer::CommunicationServer(const char *addressString, uint16_t por
     if (setsockopt(m_server_fd, SOL_SOCKET,
                    SO_REUSEADDR | SO_REUSEPORT, &opt,
                    sizeof(opt))) {
-        perror("setsockopt");
+        perror("Error: server setsockopt failure");
         exit(EXIT_FAILURE);
     }
     m_serv_addr.sin_family = AF_INET;
@@ -62,27 +67,28 @@ CommunicationServer::CommunicationServer(const char *addressString, uint16_t por
     if (bind(m_server_fd, (struct sockaddr*)&m_serv_addr,
              sizeof(m_serv_addr))
         < 0) {
-        perror("bind failed");
+        perror("Error: server bind failed");
         exit(EXIT_FAILURE);
     }
 
-    printf("Entering listening\n");
-
     if (listen(m_server_fd, 3) < 0) {
-        perror("listen");
+        perror("Error: server listen failure");
         exit(EXIT_FAILURE);
     }
 
     // Launch thread to handle the server state machine
-    status = WAITING_FOR_CLIENT_CONNECTION;
+    m_status = WAITING_FOR_CLIENT_CONNECTION;
     pthread_create(&m_thread, NULL, serverThread, (void*) this);
-    pthread_join(m_thread, NULL);
-    printf("\n Server thread has joined.\n");
 }
 
 CommunicationServer::~CommunicationServer()
 {
+    pthread_join(m_thread, NULL);
     delete m_queue;
+
+    // Closing server
+    close(m_server_fd);
+    printf("\n Server closed.\n");
 }
 
 void* CommunicationServer::serverThread(void *param)
@@ -94,20 +100,23 @@ void* CommunicationServer::serverThread(void *param)
 
 void CommunicationServer::serverStateMachineHandler()
 {
+    static int i = 0;
     while(1)
     {
-        if(status==WAITING_FOR_CLIENT_CONNECTION)
+        if(m_status==WAITING_FOR_CLIENT_CONNECTION)
         {
+            printf("wait iteration %d\n",i++);
             waitForClientConnection();
         }
-        if(status==CONNECTED)
+        if(m_status==CONNECTED)
         {
             sendMessagesFromQueue();
-
         }
-        if(status==TERMINATED)
+        if(m_status==TERMINATED)
         {
-            printf("\n Exiting\n");
+            printf("116");
+            close(m_socket);
+            printf("\n Client %d connection closed..\n",m_socket);
             break;
         }
     }
@@ -121,42 +130,34 @@ void CommunicationServer::waitForClientConnection()
     if ((m_socket = accept(m_server_fd, (struct sockaddr*)&m_serv_addr,
                   (socklen_t*)&addrlen)) < 0)
     {
-        printf("\nError in securing client connection.\n");
+        printf("Error in securing client connection.\n");
     }
     else
     {
-        status=CONNECTED;
+        m_status = CONNECTED;
         printf("\nConnection to client secured.\n");
     }
 }
 
 void CommunicationServer::sendMessagesFromQueue()
 {
-    int valread;
-    char hello[] = "Hello from server";
-    char buffer[CommunicationMessage::getHeaderAndDataMaxSize()] = { 0 };
+    pthread_mutex_lock( &m_queueMutex );
+    bool isEmpty = m_queue->isEmpty();
+    pthread_mutex_unlock( &m_queueMutex );
 
-    // send is a blocking call (it waits for the server to read, before continuing))
-    send(m_socket, hello, strlen(hello), 0);
-    printf("Hello message sent\n");
-    valread = read(m_socket, buffer, 1024);
-    printf("%s\n", buffer);
-    printf("%d\n", valread);
+    if (!isEmpty)
+    {
+        printf("non empty queue \n");
+        CommunicationMessage m;
+        pthread_mutex_lock( &m_queueMutex );
+        m_queue->dequeue(m);
+        pthread_mutex_unlock( &m_queueMutex );
+        printf("Sending message with data: %s\n",m.data);
+        memcpy(m_buffer,&m,CommunicationMessage::getHeaderSize() + m.size);
 
-    printf("Server is about to send a CommunicationMessage. \n");
-    CommunicationMessage m;
-    m.messageType = 0x10;
-    char a[] = "ciao";
-    memcpy(m.data,a,4);
-    m.size = sizeof(a);
-
-    memcpy(buffer,&m,CommunicationMessage::getHeaderSize() + m.size);
-    send(m_socket, buffer, CommunicationMessage::getHeaderSize() + m.size, 0);
-    printf("\n size of m.data and a are %ld and %ld\n", sizeof(m.data), sizeof(a));
-    printf("Server has sent a CommunicationMessage. \n");
-
-    // change the state machine
-    status = TERMINATED;
+        // send is a blocking call (it waits for the server to read, before continuing))
+        send(m_socket, m_buffer, CommunicationMessage::getHeaderSize() + m.size, 0);
+    }
 }
 
 /*
@@ -164,6 +165,10 @@ void CommunicationServer::sendMessagesFromQueue()
  */
 int CommunicationServer::sendMessage(CommunicationMessage message)
 {
-    return m_queue->enqueue(message);
+    int ret = 0;
+    pthread_mutex_lock( &m_queueMutex );
+    printf("actually enqueuing\n");
+    ret = m_queue->enqueue(message);
+    pthread_mutex_unlock( &m_queueMutex );
+    return ret;
 }
-

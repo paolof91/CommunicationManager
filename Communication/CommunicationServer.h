@@ -48,6 +48,8 @@ public:
     CommunicationServer(const char *addressString, uint16_t port, uint16_t queueSize);
     ~CommunicationServer();
     int sendMessage(CommunicationMessage message);
+    void terminateConnection() { m_status = TERMINATED; };
+    CommunicationServerStatus status() { return m_status; }
 
 private:
     static void* serverThread(void *param);
@@ -62,7 +64,9 @@ private:
     pthread_mutex_t m_queueMutex = PTHREAD_MUTEX_INITIALIZER;
 
     CommunicationMessageQueue* m_queue;
-    CommunicationServerStatus status;
+    CommunicationServerStatus m_status;
+
+    char m_buffer[CommunicationProtocol::MESSAGE_HEADER_AND_DATA_MAX_SIZE] = { 0 };
 };
 
 #endif // COMMUNICATIONSERVER_H

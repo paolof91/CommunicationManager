@@ -7,7 +7,6 @@ LIBS += -lpthread
 
 SOURCES += \
         ../Communication/CommunicationMessageQueue.cpp \
-        ../Communication/CommunicationProtocol.cpp \
         ../Communication/CommunicationServer.cpp \
         main.cpp
 

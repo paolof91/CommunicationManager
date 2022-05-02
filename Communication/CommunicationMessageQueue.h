@@ -41,7 +41,7 @@ public:
 
 private:
     struct QueueNode {
-        QueueNode *next;
+        QueueNode *next = nullptr;
         CommunicationMessage message;
     };
 

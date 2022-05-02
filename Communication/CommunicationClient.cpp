@@ -31,18 +31,45 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "CommunicationMessageQueue.h"
 #include "CommunicationClient.h"
-#include "CommunicationProtocol.h"
 
-CommunicationClient::CommunicationClient(const char *addressString, const unsigned short port)
+CommunicationClient::CommunicationClient(const char *addressString, uint16_t port, uint16_t queueSize)
 {
+    // Creating message queue
+    if ( queueSize == 0 )
+    {
+        perror("Error: Server queue size is 0");
+        exit(EXIT_FAILURE);
+    }
+    m_queue = new CommunicationMessageQueue(queueSize);
+
     // opening socket
+    setSocketAddress(addressString,port);
+    openSocket();
+
+    // Launch thread to handle the client state machine
+    pthread_create(&m_thread, NULL, clientThread, (void*) this);
+}
+
+CommunicationClient::~CommunicationClient()
+{
+    pthread_join(m_thread, NULL);
+    delete m_queue;
+}
+
+void CommunicationClient::openSocket()
+{
     m_socket = 0;
     if ((m_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         printf("\n Socket creation error \n");
         exit(EXIT_FAILURE);
     }
+    m_status = WAITING_FOR_SERVER_CONNECTION;
+}
 
+void CommunicationClient::setSocketAddress(const char *addressString, uint16_t port)
+{
     m_serv_addr.sin_family = AF_INET;
     m_serv_addr.sin_port = htons(port);
 
@@ -52,15 +79,9 @@ CommunicationClient::CommunicationClient(const char *addressString, const unsign
         <= 0)
     {
         printf(
-            "\nInvalid address/ Address not supported \n");
+            "\nClient socket, Invalid address/ Address not supported \n");
         exit(EXIT_FAILURE);
     }
-
-    // Launch thread to handle the client state machine
-    status = WAITING_FOR_SERVER_SOCKET;
-    pthread_create(&m_thread, NULL, clientThread, (void*) this);
-    pthread_join(m_thread, NULL);
-    printf("\n Client thread has joined.\n");
 }
 
 void* CommunicationClient::clientThread(void *param)
@@ -74,17 +95,23 @@ void CommunicationClient::clientStateMachineHandler()
 {
     while(1)
     {
-        if(status==WAITING_FOR_SERVER_SOCKET)
+        if(m_status==WAITING_FOR_SERVER_CONNECTION)
         {
             waitForServerSocket();
         }
-        if(status==CONNECTED)
+        if(m_status==CONNECTED)
         {
             receiveAndStoreMessages();
         }
-        if(status==TERMINATED)
+        if(m_status==MUST_RESTORE_CONNECTION)
         {
-            printf("\n Exiting\n");
+            close(m_socket);
+            openSocket();
+        }
+        if(m_status==TERMINATED)
+        {
+            close(m_socket);
+            printf("\n Client %d connection closed..\n",m_socket);
             break;
         }
     }
@@ -92,7 +119,7 @@ void CommunicationClient::clientStateMachineHandler()
 
 void CommunicationClient::waitForServerSocket()
 {
-    // connect is not a blocking call
+    // connect is NOT a blocking call
     if (connect(m_socket, (struct sockaddr*)&m_serv_addr, sizeof(m_serv_addr))
         < 0)
     {
@@ -101,7 +128,7 @@ void CommunicationClient::waitForServerSocket()
     }
     else
     {
-        status=CONNECTED;
+        m_status = CONNECTED;
         printf("\nConnection to server secured.\n");
     }
 }
@@ -109,27 +136,59 @@ void CommunicationClient::waitForServerSocket()
 void CommunicationClient::receiveAndStoreMessages()
 {
     int valread;
-    char buffer[CommunicationMessage::getHeaderAndDataMaxSize()] = { 0 };
-    char hello[] = "Hello from server";
+    CommunicationMessage message;
 
+    printf("Trying to read...\n");
     // read is a blocking call (it waits for the client to send something, before continuing)
-    valread = read(m_socket, buffer, 1024);
-    printf("%s\n", buffer);
-    printf("%d\n", valread);
-    send(m_socket, hello, strlen(hello), 0);
-    printf("Hello message sent\n");
+    valread = read(m_socket, m_buffer, CommunicationMessage::getHeaderSize());
+    if (valread<0)
+    {
+        printf("Unsuccessful read from client socket: header reading failed.\n");
+        m_status = MUST_RESTORE_CONNECTION;
+        return;
+    }
+    if (valread == 0)
+    {
+        printf("read() has returned 0 bytes. Connection has possibly been closed on the other side.");
+        m_status = MUST_RESTORE_CONNECTION;
+        return;
+    }
+    memcpy(&message,m_buffer,CommunicationMessage::getHeaderSize());
+    valread = read(m_socket, m_buffer, message.size);
+    if (valread<0)
+    {
+        printf("Unsuccessful read from client socket: header OK, data reading failed.\n");
+        m_status = MUST_RESTORE_CONNECTION;
+        return;
+    }
+    memcpy(&(message.data),m_buffer,message.size);
 
-    printf("Client is about to receive a CommunicationMessage. \n");
+    pthread_mutex_lock( &m_queueMutex );
+    m_queue->enqueue(message);
+    pthread_mutex_unlock( &m_queueMutex );
 
-    CommunicationMessage cm;
-    valread = read(m_socket, buffer, CommunicationMessage::getHeaderSize());
-    memcpy(&cm,buffer,CommunicationMessage::getHeaderSize());
-    printf("CommunicationMessage messageType: %d\n",cm.messageType);
-    printf("CommunicationMessage data size: %d\n",cm.size);
-    valread = read(m_socket, buffer, cm.size);
-    memcpy(&(cm.data),buffer,cm.size);
-    printf("CommunicationMessage actual data: %s\n",cm.data);
+    printf("Received and enqueued...\n");
+}
 
-    // change the state machine
-    status = TERMINATED;
+/*
+ * returns -1 if no message in the queue, otherwise returns 0
+ */
+int CommunicationClient::receiveAvailableMessage(CommunicationMessage &message)
+{
+    int ret = 0;
+
+    pthread_mutex_lock( &m_queueMutex );
+    bool isEmpty = m_queue->isEmpty();
+    pthread_mutex_unlock( &m_queueMutex );
+
+    if (!isEmpty)
+    {
+        pthread_mutex_lock( &m_queueMutex );
+        ret = m_queue->dequeue(message);
+        pthread_mutex_unlock( &m_queueMutex );
+    }
+    else
+        ret = -1;
+
+    return ret;
 }

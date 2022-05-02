@@ -31,18 +31,30 @@
 #include <netinet/ip.h>
 #include <pthread.h>
 
+#include "CommunicationProtocol.h"
+
+class CommunicationMessageQueue;
+
 enum CommunicationClientStatus
 {
-    WAITING_FOR_SERVER_SOCKET,
+    WAITING_FOR_SERVER_CONNECTION,
     CONNECTED,
+    MUST_RESTORE_CONNECTION,
     TERMINATED,
 };
 
 class CommunicationClient
 {
 public:
-    CommunicationClient(const char *addressString, const unsigned short port);
+    CommunicationClient(const char *addressString, uint16_t port, uint16_t queueSize);
+    ~CommunicationClient();
+    void terminateConnection() { m_status = TERMINATED; };
+    int receiveAvailableMessage(CommunicationMessage &message);
+    CommunicationClientStatus status() { return m_status; }
+
 private:
+    void openSocket();
+    void setSocketAddress(const char *addressString, uint16_t port);
     static void* clientThread(void *param);
     void clientStateMachineHandler();
     void waitForServerSocket();
@@ -51,7 +63,12 @@ private:
     struct sockaddr_in m_serv_addr;
     int m_socket;
     pthread_t m_thread;
-    CommunicationClientStatus status;
+    pthread_mutex_t m_queueMutex = PTHREAD_MUTEX_INITIALIZER;
+
+    CommunicationMessageQueue* m_queue;
+    CommunicationClientStatus m_status;
+
+    char m_buffer[CommunicationProtocol::MESSAGE_HEADER_AND_DATA_MAX_SIZE] = { 0 };
 };
 
 #endif // COMMUNICATIONCLIENT_H

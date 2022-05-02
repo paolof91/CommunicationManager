@@ -7,11 +7,13 @@ LIBS += -lpthread
 
 SOURCES += \
         ../Communication/CommunicationClient.cpp \
+        ../Communication/CommunicationDispatcher.cpp \
         ../Communication/CommunicationMessageQueue.cpp \
-        ../Communication/CommunicationProtocol.cpp \
         main.cpp
 
 HEADERS += \
     ../Communication/CommunicationClient.h \
+    ../Communication/CommunicationDispatcher.h \
     ../Communication/CommunicationMessageQueue.h \
-    ../Communication/CommunicationProtocol.h
+    ../Communication/CommunicationProtocol.h \
+    ../Communication/MessageTypes.h
