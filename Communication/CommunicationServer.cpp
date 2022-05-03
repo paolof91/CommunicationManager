@@ -100,7 +100,6 @@ void* CommunicationServer::serverThread(void *param)
 
 void CommunicationServer::serverStateMachineHandler()
 {
-    static int i = 0;
     while(1)
     {
         if(m_status==WAITING_FOR_CLIENT_CONNECTION)
@@ -113,7 +112,6 @@ void CommunicationServer::serverStateMachineHandler()
         }
         if(m_status==TERMINATED)
         {
-            printf("116");
             close(m_socket);
             printf("\n Client %d connection closed..\n",m_socket);
             break;

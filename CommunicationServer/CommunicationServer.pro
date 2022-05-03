@@ -8,9 +8,11 @@ LIBS += -lpthread
 SOURCES += \
         ../Communication/CommunicationMessageQueue.cpp \
         ../Communication/CommunicationServer.cpp \
+        ../Communication/CommunicationSender.cpp \
         main.cpp
 
 HEADERS += \
     ../Communication/CommunicationMessageQueue.h \
     ../Communication/CommunicationProtocol.h \
-    ../Communication/CommunicationServer.h
+    ../Communication/CommunicationServer.h \
+    ../Communication/CommunicationSender.h

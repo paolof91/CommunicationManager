@@ -2,6 +2,7 @@
 #define COMMUNICATIONDISPATCHER_H
 
 #include <pthread.h>
+#include "CommunicationProtocol.h"
 
 class CommunicationClient;
 
@@ -10,6 +11,9 @@ class CommunicationDispatcher
 public:
     CommunicationDispatcher(CommunicationClient *client);
     void startWork();
+
+protected:
+    void dispatch(CommunicationMessage message);
 
 private:
     static void* dispatcherThread(void *param);

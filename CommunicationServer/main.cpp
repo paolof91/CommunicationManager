@@ -28,29 +28,28 @@
 
 #include "../Communication/CommunicationProtocol.h"
 #include "../Communication/CommunicationServer.h"
+#include "../Communication/CommunicationSender.h"
 
 int main()
 {
     CommunicationServer server(CommunicationProtocol::PRESENTER_IP_ADDRESS,
                                CommunicationProtocol::PRESENTER_IP_PORT,
                                CommunicationProtocol::PRESENTER_SERVER_MESSAGE_QUEUE_SIZE);
-    CommunicationMessage m;
-    m.messageType = 0x10;
-    char a[] = "ciao, message 1";
-    printf("Sending: %s\n",a);
-    memcpy(m.data,a,15);
-    m.size = sizeof(a);
-    server.sendMessage(m);
+    CommunicationSender sender(&server);
 
-    a[14] = '2';
-    printf("Sending: %s\n",a);
-    memcpy(m.data,a,15);
-    server.sendMessage(m);
+    MessageTypeA mA;
+    mA.w_f = 10; mA.w_o = 20;
 
-    a[14] = '3';
-    printf("Sending: %s\n",a);
-    memcpy(m.data,a,15);
-    server.sendMessage(m);
+    MessageTypeB mB;
+    mB.v_x = 2.4; mB.v_y = -1.056; mB.v_z = -0.15; mB.v_o = 0.00012;
+
+    while(!(sender.isWorking()))
+    {
+
+    }
+
+    sender.sendMessageTypeA(mA);
+    sender.sendMessageTypeB(mB);
 
     return 0;
 }
