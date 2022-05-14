@@ -135,31 +135,50 @@ void CommunicationClient::waitForServerSocket()
 
 void CommunicationClient::receiveAndStoreMessages()
 {
-    int valread;
+    uint32_t valread, valread_temp;
     CommunicationMessage message;
 
     // read is a blocking call (it waits for the client to send something, before continuing)
     valread = read(m_socket, m_buffer, CommunicationMessage::getHeaderSize());
-    if (valread<0)
+    if (valread<=0)
     {
-        printf("Unsuccessful read from client socket: header reading failed.\n");
-        m_status = MUST_RESTORE_CONNECTION;
+        handleReadingError(valread,"message header");
         return;
     }
-    if (valread == 0)
+
+    while( valread < CommunicationMessage::getHeaderSize() )
     {
-        printf("read() has returned 0 bytes. Connection has possibly been closed on the other side.");
-        m_status = MUST_RESTORE_CONNECTION;
-        return;
+        valread_temp = read(m_socket, m_buffer+valread, CommunicationMessage::getHeaderSize()-valread);
+        if (valread_temp <= 0)
+        {
+            handleReadingError(valread,"message header");
+            return;
+        }
+        valread += valread_temp;
     }
+
+    // message header is complete, let's copy it in message and read message.size
     memcpy(&message,m_buffer,CommunicationMessage::getHeaderSize());
+
     valread = read(m_socket, m_buffer, message.size);
-    if (valread<0)
+    if (valread<=0)
     {
-        printf("Unsuccessful read from client socket: header OK, data reading failed.\n");
-        m_status = MUST_RESTORE_CONNECTION;
+        handleReadingError(valread,"message data");
         return;
     }
+
+    while( valread < message.size)
+    {
+        valread_temp = read(m_socket, m_buffer+valread, message.size-valread);
+        if (valread_temp<= 0)
+        {
+            handleReadingError(valread,"message data");
+            return;
+        }
+        valread += valread_temp;
+    }
+
+    // message data is complete, let's copy it in message and enqueue it
     memcpy(&(message.data),m_buffer,message.size);
 
     pthread_mutex_lock( &m_queueMutex );
@@ -188,4 +207,20 @@ int CommunicationClient::receiveMessageIfAvailable(CommunicationMessage &message
         ret = -1;
 
     return ret;
+}
+
+void CommunicationClient::handleReadingError(int valread, const char* source)
+{
+    if (valread<0)
+    {
+        printf("Unsuccessful read from client socket: [%s] reading failed.\n", source);
+        m_status = MUST_RESTORE_CONNECTION;
+        return;
+    }
+    if (valread == 0)
+    {
+        printf("read() in [%s] has returned 0 bytes. Connection has possibly been closed on the other side.\n", source);
+        m_status = MUST_RESTORE_CONNECTION;
+        return;
+    }
 }

@@ -138,6 +138,7 @@ void CommunicationServer::waitForClientConnection()
 
 void CommunicationServer::sendMessagesFromQueue()
 {
+    uint32_t valsent;
     pthread_mutex_lock( &m_queueMutex );
     bool isEmpty = m_queue->isEmpty();
     pthread_mutex_unlock( &m_queueMutex );
@@ -151,7 +152,8 @@ void CommunicationServer::sendMessagesFromQueue()
         memcpy(m_buffer,&m,CommunicationMessage::getHeaderSize() + m.size);
 
         // send is a blocking call (it waits for the server to read, before continuing))
-        send(m_socket, m_buffer, CommunicationMessage::getHeaderSize() + m.size, 0);
+        valsent = send(m_socket, m_buffer, CommunicationMessage::getHeaderSize() + m.size, 0);
+        printf("\nValsent: %d.\n", valsent);
     }
 }
 

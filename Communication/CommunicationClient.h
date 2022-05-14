@@ -59,6 +59,7 @@ private:
     void clientStateMachineHandler();
     void waitForServerSocket();
     void receiveAndStoreMessages();
+    void handleReadingError(int valread, const char* source);
 
     struct sockaddr_in m_serv_addr;
     int m_socket;
